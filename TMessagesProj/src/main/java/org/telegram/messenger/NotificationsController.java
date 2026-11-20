@@ -4719,8 +4719,8 @@ public class NotificationsController extends BaseController implements Notificat
                     mBuilder.setLargeIcon(img.getBitmap());
                 } else {
                     try {
-                        File file = getFileLoader().getPathToAttach(photoPath, true);
-                        if (file.exists()) {
+                        File file = avatarFileFor(photoPath);
+                        if (file != null && file.exists()) {
                             float scaleFactor = 160.0f / AndroidUtilities.dp(50);
                             BitmapFactory.Options options = new BitmapFactory.Options();
                             options.inSampleSize = scaleFactor < 1 ? 1 : (int) scaleFactor;
@@ -5201,7 +5201,7 @@ public class NotificationsController extends BaseController implements Notificat
             }
 
             if (photoPath != null) {
-                avatarFile = getFileLoader().getPathToAttach(photoPath, true);
+                avatarFile = avatarFileFor(photoPath);
                 if (Build.VERSION.SDK_INT < 28) {
                     BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50");
                     if (img != null) {
@@ -5293,7 +5293,7 @@ public class NotificationsController extends BaseController implements Notificat
                 try {
                     if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
                         Person.Builder personBuilder = new Person.Builder().setName(LocaleController.getString(R.string.FromYou));
-                        File avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
+                        File avatar = avatarFileFor(sender.photo.photo_small);
                         loadRoundAvatar(getUserConfig().getClientUserId(), avatar, personBuilder);
                         selfPerson = personBuilder.build();
                         personCache.put(selfUserId, selfPerson);
@@ -5443,19 +5443,19 @@ public class NotificationsController extends BaseController implements Notificat
                                     }
                                 }
                                 if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
-                                    avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
+                                    avatar = avatarFileFor(sender.photo.photo_small);
                                 }
                             }
                             if (avatar == null && dialogId == UserObject.VERIFY && messageObject.getForwardedFromId() != null) {
                                 if (uid >= 0) {
                                     TLRPC.User sender = getMessagesController().getUser(uid);
                                     if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
-                                        avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
+                                        avatar = avatarFileFor(sender.photo.photo_small);
                                     }
                                 } else {
                                     TLRPC.Chat sender = getMessagesController().getChat(-uid);
                                     if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
-                                        avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
+                                        avatar = avatarFileFor(sender.photo.photo_small);
                                     }
                                 }
                             }
@@ -5875,12 +5875,9 @@ public class NotificationsController extends BaseController implements Notificat
             if (user1 != null) {
                 username = UserObject.getUserName(user1);
                 if (user1 != null && user1.photo != null && user1.photo.photo_small != null && user1.photo.photo_small.volume_id != 0 && user1.photo.photo_small.local_id != 0) {
-                    File file = getFileLoader().getPathToAttach(user1.photo.photo_small, true);
-                    if (!file.exists()) {
-                        file = null;
-                        if (user1.photo.photo_big != null) {
-                            file = getFileLoader().getPathToAttach(user1.photo.photo_big, true);
-                        }
+                    File file = avatarFileFor(user1.photo.photo_small);
+                    if (file == null || !file.exists()) {
+                        file = user1.photo.photo_big != null ? avatarFileFor(user1.photo.photo_big) : null;
                         if (file != null && !file.exists()) {
                             file = null;
                         }
@@ -5908,6 +5905,22 @@ public class NotificationsController extends BaseController implements Notificat
             avatars.clear();
         }
         return new Pair<>(storiesCount, hidden);
+    }
+
+    /**
+     * OwpengramServers: avatar files are written to MEDIA_DIR_IMAGE under the per-server scoped
+     * name (or an unscoped legacy copy). Check that real location first; only then fall back to
+     * the cache directory used by forceCache callers.
+     */
+    private File avatarFileFor(TLRPC.FileLocation location) {
+        if (location == null) {
+            return null;
+        }
+        File file = getFileLoader().getPathToAttach(location, false);
+        if (file != null && file.exists()) {
+            return file;
+        }
+        return getFileLoader().getPathToAttach(location, true);
     }
 
     public static Person.Builder loadRoundAvatar(long dialogId, File avatar, Person.Builder personBuilder) {

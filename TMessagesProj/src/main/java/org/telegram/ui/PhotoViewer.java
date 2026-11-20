@@ -13607,9 +13607,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                     return null;
                 }
                 if (videoLocation != null && videoLocation != location) {
-                    return videoLocation.location.volume_id + "_" + videoLocation.location.local_id + ".mp4";
+                    return FileLoader.applyServerScope(videoLocation.location.volume_id + "_" + videoLocation.location.local_id + ".mp4", currentAccount);
                 } else {
-                    return location.location.volume_id + "_" + location.location.local_id + ".jpg";
+                    return FileLoader.applyServerScope(location.location.volume_id + "_" + location.location.local_id + ".jpg", currentAccount);
                 }
             } else {
                 if (index >= imagesArr.size()) {

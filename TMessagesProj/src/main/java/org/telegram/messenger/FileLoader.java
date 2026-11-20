@@ -1437,7 +1437,21 @@ public class FileLoader extends BaseController {
                 return new File(path);
             }
         }
-        return new File(dir, getAttachFileName(attach, ext));
+        String fileName = getAttachFileName(attach, null, ext, currentAccount);
+        File file = new File(dir, fileName);
+        if (needsServerScope(attach) && !file.exists()) {
+            // Files cached before the per-server scope was introduced keep their old, unscoped
+            // name. Prefer that copy when it exists so an update does not turn an already
+            // downloaded photo/avatar into "not downloaded" (and break Save to gallery).
+            String legacyName = getAttachFileNameInternal(attach, null, ext);
+            if (!legacyName.equals(fileName)) {
+                File legacy = new File(dir, legacyName);
+                if (legacy.exists()) {
+                    return legacy;
+                }
+            }
+        }
+        return file;
     }
 
     public FilePathDatabase getFileDatabase() {
@@ -1658,27 +1672,72 @@ public class FileLoader extends BaseController {
      * fileDidLoaded callback match nothing, so the avatar just never renders.
      */
     private static String scopedFileLocationName(TLRPC.FileLocation location, String ext, int currentAccount) {
-        String name = getAttachFileName(location, ext);
-        if (currentAccount >= 0 && !TextUtils.isEmpty(name)) {
-            try {
-                String scope = OwpengramServers.serverScopeKeyForAccount(currentAccount);
-                if (!scope.isEmpty()) {
-                    int dot = name.lastIndexOf('.');
-                    String base = dot >= 0 ? name.substring(0, dot) : name;
-                    String suffix = dot >= 0 ? name.substring(dot) : "";
-                    name = base + "_s" + Integer.toHexString(scope.hashCode()) + suffix;
-                }
-            } catch (Exception e) {
-                FileLog.e(e);
-            }
+        return applyServerScope(getAttachFileNameInternal(location, null, ext), currentAccount);
+    }
+
+    /**
+     * OwpengramServers: append the per-server scope (see {@link #scopedFileLocationName}) to an
+     * already built media file name. Applied before the extension and idempotent, so callers that
+     * only have a name string can stay in sync with the download path.
+     */
+    public static String applyServerScope(String name, int currentAccount) {
+        if (currentAccount < 0 || TextUtils.isEmpty(name)) {
+            return name;
         }
-        return name;
+        try {
+            String scope = OwpengramServers.serverScopeKeyForAccount(currentAccount);
+            if (scope.isEmpty()) {
+                return name;
+            }
+            String marker = "_s" + Integer.toHexString(scope.hashCode());
+            int dot = name.lastIndexOf('.');
+            String base = dot >= 0 ? name.substring(0, dot) : name;
+            if (base.endsWith(marker)) {
+                return name;
+            }
+            String suffix = dot >= 0 ? name.substring(dot) : "";
+            return base + marker + suffix;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return name;
+        }
+    }
+
+    /**
+     * Whether a media attachment is addressed by a server-issued id and therefore needs the
+     * per-server scope in its file name. Locally created photos (camera/avatar uploads) use
+     * volume_id = Integer.MIN_VALUE and keep their historical unscoped cache name.
+     */
+    private static boolean needsServerScope(TLObject attach) {
+        if (attach instanceof TLRPC.PhotoSize) {
+            TLRPC.PhotoSize photo = (TLRPC.PhotoSize) attach;
+            return photo.location != null && photo.location.key == null && photo.location.volume_id != Integer.MIN_VALUE;
+        } else if (attach instanceof TLRPC.TL_videoSize) {
+            TLRPC.TL_videoSize video = (TLRPC.TL_videoSize) attach;
+            return video.location != null && video.location.key == null && video.location.volume_id != Integer.MIN_VALUE;
+        } else if (attach instanceof TLRPC.FileLocation) {
+            TLRPC.FileLocation location = (TLRPC.FileLocation) attach;
+            return location.key == null && location.volume_id != Integer.MIN_VALUE;
+        }
+        return false;
     }
 
     /**
      * file hash. contains docId, dcId, ext.
      */
     public static String getAttachFileName(TLObject attach, String size, String ext) {
+        return getAttachFileName(attach, size, ext, UserConfig.selectedAccount);
+    }
+
+    public static String getAttachFileName(TLObject attach, String size, String ext, int currentAccount) {
+        String name = getAttachFileNameInternal(attach, size, ext);
+        if (needsServerScope(attach)) {
+            return applyServerScope(name, currentAccount);
+        }
+        return name;
+    }
+
+    private static String getAttachFileNameInternal(TLObject attach, String size, String ext) {
         if (attach instanceof TLRPC.Document) {
             TLRPC.Document document = (TLRPC.Document) attach;
             String docExt;
