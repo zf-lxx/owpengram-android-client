@@ -4713,24 +4713,36 @@ public class NotificationsController extends BaseController implements Notificat
 
             if (largeBitmap != null) {
                 mBuilder.setLargeIcon(largeBitmap);
-            } else if (photoPath != null) {
-                BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50");
-                if (img != null) {
-                    mBuilder.setLargeIcon(img.getBitmap());
-                } else {
-                    try {
-                        File file = avatarFileFor(photoPath);
-                        if (file != null && file.exists()) {
-                            float scaleFactor = 160.0f / AndroidUtilities.dp(50);
-                            BitmapFactory.Options options = new BitmapFactory.Options();
-                            options.inSampleSize = scaleFactor < 1 ? 1 : (int) scaleFactor;
-                            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
-                            if (bitmap != null) {
-                                mBuilder.setLargeIcon(bitmap);
+            } else {
+                boolean iconSet = false;
+                if (photoPath != null) {
+                    BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50");
+                    if (img != null) {
+                        mBuilder.setLargeIcon(img.getBitmap());
+                        iconSet = true;
+                    } else {
+                        try {
+                            File file = avatarFileFor(photoPath);
+                            if (file != null && file.exists()) {
+                                float scaleFactor = 160.0f / AndroidUtilities.dp(50);
+                                BitmapFactory.Options options = new BitmapFactory.Options();
+                                options.inSampleSize = scaleFactor < 1 ? 1 : (int) scaleFactor;
+                                Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+                                if (bitmap != null) {
+                                    mBuilder.setLargeIcon(bitmap);
+                                    iconSet = true;
+                                }
                             }
-                        }
-                    } catch (Throwable ignore) {
+                        } catch (Throwable ignore) {
 
+                        }
+                    }
+                }
+                if (!iconSet && pushDialogs.size() == 1) {
+                    // No cached photo: keep Telegram's coloured initial circle instead of a blank spot.
+                    Bitmap letter = letterAvatarBitmap(chat != null ? chat : user);
+                    if (letter != null) {
+                        mBuilder.setLargeIcon(letter);
                     }
                 }
             }
@@ -5217,6 +5229,9 @@ public class NotificationsController extends BaseController implements Notificat
                         } catch (Throwable ignore) {
 
                         }
+                        if (avatarBitmap == null) {
+                            avatarBitmap = letterAvatarBitmap(chat != null ? chat : user);
+                        }
                     }
                 }
             }
@@ -5225,6 +5240,11 @@ public class NotificationsController extends BaseController implements Notificat
                 Person.Builder personBuilder = new Person.Builder().setName(name);
                 if (avatarFile != null && avatarFile.exists() && Build.VERSION.SDK_INT >= 28) {
                     loadRoundAvatar(dialogId, avatarFile, personBuilder);
+                } else if (Build.VERSION.SDK_INT >= 28) {
+                    Bitmap letter = letterAvatarBitmap(chat);
+                    if (letter != null) {
+                        personBuilder.setIcon(IconCompat.createWithBitmap(letter));
+                    }
                 }
                 personCache.put(-chat.id, personBuilder.build());
             }
@@ -5294,7 +5314,14 @@ public class NotificationsController extends BaseController implements Notificat
                     if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
                         Person.Builder personBuilder = new Person.Builder().setName(LocaleController.getString(R.string.FromYou));
                         File avatar = avatarFileFor(sender.photo.photo_small);
-                        loadRoundAvatar(getUserConfig().getClientUserId(), avatar, personBuilder);
+                        if (avatar == null || !avatar.exists()) {
+                            Bitmap letter = letterAvatarBitmap(sender);
+                            if (letter != null) {
+                                personBuilder.setIcon(IconCompat.createWithBitmap(letter));
+                            }
+                        } else {
+                            loadRoundAvatar(getUserConfig().getClientUserId(), avatar, personBuilder);
+                        }
                         selfPerson = personBuilder.build();
                         personCache.put(selfUserId, selfPerson);
                     }
@@ -5431,8 +5458,10 @@ public class NotificationsController extends BaseController implements Notificat
                         Person.Builder personBuilder = new Person.Builder().setName(personName);
                         if (preview[0] && !DialogObject.isEncryptedDialog(dialogId) && Build.VERSION.SDK_INT >= 28) {
                             File avatar = null;
+                            Object letterPeer = null;
                             if (DialogObject.isUserDialog(dialogId) || isChannel) {
                                 avatar = avatarFile;
+                                letterPeer = isChannel ? chat : user;
                             } else {
                                 long fromId = messageObject.getSenderId();
                                 TLRPC.User sender = getMessagesController().getUser(fromId);
@@ -5442,6 +5471,7 @@ public class NotificationsController extends BaseController implements Notificat
                                         getMessagesController().putUser(sender, true);
                                     }
                                 }
+                                letterPeer = sender;
                                 if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
                                     avatar = avatarFileFor(sender.photo.photo_small);
                                 }
@@ -5459,7 +5489,14 @@ public class NotificationsController extends BaseController implements Notificat
                                     }
                                 }
                             }
-                            loadRoundAvatar(dialogId, avatar, personBuilder);
+                            if (avatar != null && avatar.exists()) {
+                                loadRoundAvatar(dialogId, avatar, personBuilder);
+                            } else {
+                                Bitmap letter = letterAvatarBitmap(letterPeer);
+                                if (letter != null) {
+                                    personBuilder.setIcon(IconCompat.createWithBitmap(letter));
+                                }
+                            }
                         }
                         person = personBuilder.build();
                         personCache.put(uid, person);
@@ -5921,6 +5958,34 @@ public class NotificationsController extends BaseController implements Notificat
             return file;
         }
         return getFileLoader().getPathToAttach(location, true);
+    }
+
+    /**
+     * Coloured circle with the peer's initials, matching the in-app avatar, so a notification for
+     * a user/chat without a profile photo does not show an empty spot.
+     */
+    private Bitmap letterAvatarBitmap(Object peer) {
+        if (peer == null) {
+            return null;
+        }
+        try {
+            AvatarDrawable drawable = new AvatarDrawable();
+            if (peer instanceof TLRPC.User) {
+                drawable.setInfo(currentAccount, (TLRPC.User) peer);
+            } else if (peer instanceof TLRPC.Chat) {
+                drawable.setInfo(currentAccount, (TLRPC.Chat) peer);
+            } else {
+                return null;
+            }
+            int size = AndroidUtilities.dp(64);
+            Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            drawable.setBounds(0, 0, size, size);
+            drawable.draw(new Canvas(bitmap));
+            return bitmap;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        }
     }
 
     public static Person.Builder loadRoundAvatar(long dialogId, File avatar, Person.Builder personBuilder) {
