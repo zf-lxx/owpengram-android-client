@@ -38,13 +38,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK and build tools
+      # The ubuntu-latest image ships a complete Android SDK at
+      # $ANDROID_HOME. android-actions/setup-android@v3 is deliberately not used:
+      # it runs `sdkmanager tools`, and that package no longer exists in the
+      # current repository, so it fails before any build starts.
+      - name: Install NDK, CMake and build tools
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1" "platforms;android-36" "build-tools;36.0.0"
+          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;27.2.12479018" "cmake;3.22.1" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Cache Gradle
         uses: actions/cache@v4
