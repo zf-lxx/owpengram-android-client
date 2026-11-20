@@ -4652,7 +4652,12 @@ public class NotificationsController extends BaseController implements Notificat
                 if (AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter) {
                     photoPath = null;
                 } else {
-                    if (pushDialogs.size() == 1 && Build.VERSION.SDK_INT < 28) {
+                    // Self-hosted build: show the chat avatar as the notification large icon on
+                    // every Android version, not only below API 28. Upstream limits this to
+                    // SDK < 28 because an FCM push can arrive before the peer photo has synced;
+                    // here messages arrive over the long-lived connection, so the avatar is
+                    // usually already cached and the banner would otherwise stay blank.
+                    if (pushDialogs.size() == 1) {
                         if (chat != null) {
                             if (chat.photo != null && chat.photo.photo_small != null && chat.photo.photo_small.volume_id != 0 && chat.photo.photo_small.local_id != 0) {
                                 photoPath = chat.photo.photo_small;
