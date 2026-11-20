@@ -29,8 +29,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      # The build applies TMessagesProj_Modules/media/core_settings.gradle and
+      # compiles the native tree, so the 19 submodules must be present; without
+      # them Gradle fails on the missing settings script before any task runs.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
