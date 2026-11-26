@@ -1981,6 +1981,15 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
             full.profile_photo = photosPhoto.photo;
             getMessagesStorage().updateUserInfo(full, false);
         }
+        // The bot profile page (ProfileActivity + ProfileGalleryView) is often
+        // still on the back stack. UPDATE_MASK_AVATAR alone does not rebuild
+        // that full-bleed header: initIfEmpty only refetches when photo_big
+        // local_id changes, and official synthesized locations always use
+        // local_id='c'. changeChatAvatar posts reloadDialogPhotos for the
+        // same reason; do the same here and force-refresh UserFull.
+        getMessagesController().getDialogPhotos(user.id).reset();
+        NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.reloadDialogPhotos);
+        getMessagesController().loadFullUser(user, classGuid, true);
         currentUser = user;
     }
 
