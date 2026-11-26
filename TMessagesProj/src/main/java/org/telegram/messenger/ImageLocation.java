@@ -472,6 +472,11 @@ public class ImageLocation {
      * createLoadOperationForImageReceiver), so without scoping, an account on server B would
      * silently render server A's cached avatar bytes for a colliding id. currentAccount < 0 (no
      * account context available at the call site) keeps the original unscoped key, unchanged.
+     *
+     * Local-only locations (volume_id == Integer.MIN_VALUE, e.g. ImageUpdater / scaleAndSaveImage
+     * writes with SharedConfig.getLastLocalId()) are device-unique, not server-issued, so they
+     * cannot collide across backends. ImageUpdater also writes the unscoped filename and
+     * putImageToCache key; scoping those reads would miss the file and show the letter avatar.
      */
     public String getKey(Object parentObject, Object fullObject, boolean url, int currentAccount) {
         if (secureDocument != null) {
@@ -482,7 +487,7 @@ public class ImageLocation {
             }
         } else if (location != null) {
             String key = location.volume_id + "_" + location.local_id;
-            if (currentAccount >= 0) {
+            if (currentAccount >= 0 && location.volume_id != Integer.MIN_VALUE) {
                 try {
                     String scope = OwpengramServers.serverScopeKeyForAccount(currentAccount);
                     if (!scope.isEmpty()) {
