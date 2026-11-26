@@ -47,6 +47,7 @@ import org.telegram.messenger.secretmedia.EncryptedFileInputStream;
 import org.telegram.messenger.utils.BitmapsCache;
 import org.telegram.messenger.wallpaper.WallpaperGiftBitmapDrawable;
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.owpengram.OwpengramServers;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Cells.ChatMessageCell;
@@ -2873,6 +2874,10 @@ public class ImageLoader {
     }
 
     public BitmapDrawable getImageFromMemory(TLObject fileLocation, String httpUrl, String filter) {
+        return getImageFromMemory(fileLocation, httpUrl, filter, -1);
+    }
+
+    public BitmapDrawable getImageFromMemory(TLObject fileLocation, String httpUrl, String filter, int currentAccount) {
         if (fileLocation == null && httpUrl == null) {
             return null;
         }
@@ -2883,6 +2888,18 @@ public class ImageLoader {
             if (fileLocation instanceof TLRPC.FileLocation) {
                 TLRPC.FileLocation location = (TLRPC.FileLocation) fileLocation;
                 key = location.volume_id + "_" + location.local_id;
+                // Same scope suffix ImageLocation.getKey / FileLoader.scopedFileLocationName use,
+                // so a notification largeIcon lookup hits the in-memory avatar already shown in-app.
+                if (currentAccount >= 0 && location.volume_id != Integer.MIN_VALUE) {
+                    try {
+                        String scope = OwpengramServers.serverScopeKeyForAccount(currentAccount);
+                        if (!scope.isEmpty()) {
+                            key += "_s" + Integer.toHexString(scope.hashCode());
+                        }
+                    } catch (Exception e) {
+                        FileLog.e(e);
+                    }
+                }
             } else if (fileLocation instanceof TLRPC.Document) {
                 TLRPC.Document location = (TLRPC.Document) fileLocation;
                 key = location.dc_id + "_" + location.id;
