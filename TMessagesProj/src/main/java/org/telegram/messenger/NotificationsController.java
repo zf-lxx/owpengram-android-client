@@ -70,7 +70,9 @@ import org.telegram.messenger.support.LongSparseIntArray;
 import org.telegram.messenger.utils.tlutils.TLKeyboardHelper;
 import org.telegram.messenger.utils.tlutils.TlUtils;
 import org.telegram.messenger.voip.VoIPGroupNotification;
+import org.telegram.messenger.voip.VoIPService;
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_keyboard;
@@ -5223,8 +5225,8 @@ public class NotificationsController extends BaseController implements Notificat
 
             if (chat != null) {
                 Person.Builder personBuilder = new Person.Builder().setName(name);
-                if (avatarFile != null && avatarFile.exists() && Build.VERSION.SDK_INT >= 28) {
-                    loadRoundAvatar(dialogId, avatarFile, personBuilder);
+                if (Build.VERSION.SDK_INT >= 28) {
+                    loadRoundAvatar(dialogId, avatarFile, chat, currentAccount, personBuilder);
                 }
                 personCache.put(-chat.id, personBuilder.build());
             }
@@ -5291,10 +5293,13 @@ public class NotificationsController extends BaseController implements Notificat
                     sender = getUserConfig().getCurrentUser();
                 }
                 try {
-                    if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
+                    if (sender != null) {
                         Person.Builder personBuilder = new Person.Builder().setName(LocaleController.getString(R.string.FromYou));
-                        File avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
-                        loadRoundAvatar(getUserConfig().getClientUserId(), avatar, personBuilder);
+                        File avatar = null;
+                        if (sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
+                            avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
+                        }
+                        loadRoundAvatar(getUserConfig().getClientUserId(), avatar, sender, currentAccount, personBuilder);
                         selfPerson = personBuilder.build();
                         personCache.put(selfUserId, selfPerson);
                     }
@@ -5431,8 +5436,10 @@ public class NotificationsController extends BaseController implements Notificat
                         Person.Builder personBuilder = new Person.Builder().setName(personName);
                         if (preview[0] && !DialogObject.isEncryptedDialog(dialogId) && Build.VERSION.SDK_INT >= 28) {
                             File avatar = null;
+                            TLObject iconPeer = null;
                             if (DialogObject.isUserDialog(dialogId) || isChannel) {
                                 avatar = avatarFile;
+                                iconPeer = user != null ? user : chat;
                             } else {
                                 long fromId = messageObject.getSenderId();
                                 TLRPC.User sender = getMessagesController().getUser(fromId);
@@ -5442,6 +5449,7 @@ public class NotificationsController extends BaseController implements Notificat
                                         getMessagesController().putUser(sender, true);
                                     }
                                 }
+                                iconPeer = sender;
                                 if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
                                     avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
                                 }
@@ -5449,17 +5457,19 @@ public class NotificationsController extends BaseController implements Notificat
                             if (avatar == null && dialogId == UserObject.VERIFY && messageObject.getForwardedFromId() != null) {
                                 if (uid >= 0) {
                                     TLRPC.User sender = getMessagesController().getUser(uid);
+                                    iconPeer = sender;
                                     if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
                                         avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
                                     }
                                 } else {
                                     TLRPC.Chat sender = getMessagesController().getChat(-uid);
+                                    iconPeer = sender;
                                     if (sender != null && sender.photo != null && sender.photo.photo_small != null && sender.photo.photo_small.volume_id != 0 && sender.photo.photo_small.local_id != 0) {
                                         avatar = getFileLoader().getPathToAttach(sender.photo.photo_small, true);
                                     }
                                 }
                             }
-                            loadRoundAvatar(dialogId, avatar, personBuilder);
+                            loadRoundAvatar(dialogId, avatar, iconPeer, currentAccount, personBuilder);
                         }
                         person = personBuilder.build();
                         personCache.put(uid, person);
@@ -5911,11 +5921,23 @@ public class NotificationsController extends BaseController implements Notificat
     }
 
     public static Person.Builder loadRoundAvatar(long dialogId, File avatar, Person.Builder personBuilder) {
+        return loadRoundAvatar(dialogId, avatar, null, UserConfig.selectedAccount, personBuilder);
+    }
+
+    /**
+     * Fork divergence (not official): stock DrKLO loadRoundAvatar only decodes photo_small
+     * from disk and leaves Person without an icon when the peer has no profile photo, so
+     * the shade shows a blank hole. In-app DialogCell still paints AvatarDrawable (colored
+     * circle + initial). When no file is available, reuse VoIPService.getRoundAvatarBitmap
+     * — the official call-notification letter fallback — so a newly created bot/user
+     * without a photo matches the chat list.
+     */
+    public static Person.Builder loadRoundAvatar(long dialogId, File avatar, TLObject userOrChat, int currentAccount, Person.Builder personBuilder) {
         if (dialogId == UserObject.OAUTH) {
             personBuilder.setIcon(IconCompat.createWithResource(ApplicationLoader.applicationContext, R.drawable.ic_launcher_dr));
             return personBuilder;
         }
-        if (avatar != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        if (avatar != null && avatar.exists() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 Bitmap bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(avatar), (decoder, info, src) -> {
                     decoder.setPostProcessor((canvas) -> {
@@ -5934,6 +5956,17 @@ public class NotificationsController extends BaseController implements Notificat
                 });
                 IconCompat icon = IconCompat.createWithBitmap(bitmap);
                 personBuilder.setIcon(icon);
+                return personBuilder;
+            } catch (Throwable ignore) {
+
+            }
+        }
+        if (userOrChat != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                Bitmap letter = VoIPService.getRoundAvatarBitmap(ApplicationLoader.applicationContext, currentAccount, userOrChat);
+                if (letter != null) {
+                    personBuilder.setIcon(IconCompat.createWithBitmap(letter));
+                }
             } catch (Throwable ignore) {
 
             }
