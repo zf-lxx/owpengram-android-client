@@ -1656,10 +1656,14 @@ public class FileLoader extends BaseController {
      * ImageLoader matches a finished download back to its pending CacheImage entry by this same
      * string. A mismatch here doesn't show the wrong avatar -- it makes the download's
      * fileDidLoaded callback match nothing, so the avatar just never renders.
+     *
+     * volume_id == Integer.MIN_VALUE is a local-only ImageUpdater / scaleAndSaveImage location,
+     * not a server-issued id; leave it unsuffixed so getPathToAttach matches the unscoped file
+     * on disk. Official Telegram (empty scope) is unchanged either way.
      */
     private static String scopedFileLocationName(TLRPC.FileLocation location, String ext, int currentAccount) {
         String name = getAttachFileName(location, ext);
-        if (currentAccount >= 0 && !TextUtils.isEmpty(name)) {
+        if (currentAccount >= 0 && location != null && location.volume_id != Integer.MIN_VALUE && !TextUtils.isEmpty(name)) {
             try {
                 String scope = OwpengramServers.serverScopeKeyForAccount(currentAccount);
                 if (!scope.isEmpty()) {

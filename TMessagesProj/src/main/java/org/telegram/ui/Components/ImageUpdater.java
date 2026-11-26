@@ -842,6 +842,20 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
         }
     }
 
+    // Use the same key ImageReceiver/ImageLoader will look up (including any future
+    // server-scope suffix). Local ImageUpdater files use volume_id=Integer.MIN_VALUE,
+    // which getKey leaves unsuffixed so this matches scaleAndSaveImage's filename.
+    private String previewCacheKey(TLRPC.PhotoSize photoSize) {
+        if (photoSize == null || photoSize.location == null) {
+            return null;
+        }
+        String key = ImageLocation.getForLocal(photoSize.location).getKey(null, null, false, currentAccount);
+        if (key == null) {
+            key = photoSize.location.volume_id + "_" + photoSize.location.local_id;
+        }
+        return key + "@50_50";
+    }
+
     private void processBitmap(boolean fromAvatarConstructor, Bitmap bitmap, MessageObject avatarObject) {
         if (bitmap == null) {
             return;
@@ -856,7 +870,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
         if (smallPhoto != null) {
             try {
                 Bitmap b = smallPhotoBitmap = BitmapFactory.decodeFile(FileLoader.getInstance(currentAccount).getPathToAttach(smallPhoto, true).getAbsolutePath());
-                String key = smallPhoto.location.volume_id + "_" + smallPhoto.location.local_id + "@50_50";
+                String key = previewCacheKey(smallPhoto);
                 ImageLoader.getInstance().putImageToCache(new BitmapDrawable(b), key, true);
             } catch (Throwable ignore) {
 
@@ -1038,7 +1052,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
                     if (smallPhoto != null) {
                         try {
                             Bitmap b = BitmapFactory.decodeFile(FileLoader.getInstance(currentAccount).getPathToAttach(smallPhoto, true).getAbsolutePath());
-                            String key = smallPhoto.location.volume_id + "_" + smallPhoto.location.local_id + "@50_50";
+                            String key = previewCacheKey(smallPhoto);
                             ImageLoader.getInstance().putImageToCache(new BitmapDrawable(b), key, true);
                         } catch (Throwable ignore) {
 
