@@ -1437,7 +1437,29 @@ public class FileLoader extends BaseController {
                 return new File(path);
             }
         }
-        return new File(dir, getAttachFileName(attach, ext));
+        return new File(dir, attachFileNameForPath(attach, ext));
+    }
+
+    /**
+     * Disk name for a path lookup. FileLocation-based photo/avatar files are stored under
+     * {@link #scopedFileLocationName}; {@link #getAttachFileName} is the unscoped basename.
+     * Notifications and other getPathToAttach callers must use the scoped name or they look
+     * for a file that was never written on a custom server. Official Telegram (empty scope)
+     * returns the same string as getAttachFileName.
+     */
+    private String attachFileNameForPath(TLObject attach, String ext) {
+        TLRPC.FileLocation location = null;
+        if (attach instanceof TLRPC.FileLocation) {
+            location = (TLRPC.FileLocation) attach;
+        } else if (attach instanceof TLRPC.PhotoSize) {
+            location = ((TLRPC.PhotoSize) attach).location;
+        } else if (attach instanceof TLRPC.TL_videoSize) {
+            location = ((TLRPC.TL_videoSize) attach).location;
+        }
+        if (location != null) {
+            return scopedFileLocationName(location, ext, currentAccount);
+        }
+        return getAttachFileName(attach, ext);
     }
 
     public FilePathDatabase getFileDatabase() {

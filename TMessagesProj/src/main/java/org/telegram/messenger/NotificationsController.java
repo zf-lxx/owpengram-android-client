@@ -4714,7 +4714,7 @@ public class NotificationsController extends BaseController implements Notificat
             if (largeBitmap != null) {
                 mBuilder.setLargeIcon(largeBitmap);
             } else if (photoPath != null) {
-                BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50");
+                BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50", currentAccount);
                 if (img != null) {
                     mBuilder.setLargeIcon(img.getBitmap());
                 } else {
@@ -5203,7 +5203,7 @@ public class NotificationsController extends BaseController implements Notificat
             if (photoPath != null) {
                 avatarFile = getFileLoader().getPathToAttach(photoPath, true);
                 if (Build.VERSION.SDK_INT < 28) {
-                    BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50");
+                    BitmapDrawable img = ImageLoader.getInstance().getImageFromMemory(photoPath, null, "50_50", currentAccount);
                     if (img != null) {
                         avatarBitmap = img.getBitmap();
                     } else {
