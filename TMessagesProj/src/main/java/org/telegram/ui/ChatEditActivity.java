@@ -53,7 +53,9 @@ import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.Emoji;
+import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
@@ -62,6 +64,7 @@ import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
+import org.telegram.messenger.utils.PhotoUtilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
@@ -111,6 +114,7 @@ import org.telegram.ui.community.CommunityEditActivity;
 import org.telegram.ui.community.CommunitySheet;
 import org.telegram.ui.community.cells.CommunityLinkView2;
 
+import java.io.File;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -1925,19 +1929,72 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
         avatarProgressView.setProgress(0.0f);
     }
 
+    private void showLocalAvatarPreview() {
+        if (avatarImage == null || avatar == null) {
+            return;
+        }
+        avatarImage.setImage(ImageLocation.getForLocal(avatar), "50_50", avatarDrawable, currentUser != null ? currentUser : currentChat);
+        if (setAvatarCell != null) {
+            setAvatarCell.setTextAndIcon(getString("ChatSetNewPhoto", R.string.ChatSetNewPhoto), R.drawable.msg_addphoto, true);
+            if (cameraDrawable == null) {
+                cameraDrawable = new RLottieDrawable(R.raw.camera_outline, dp(50), dp(50), false, null);
+            }
+            setAvatarCell.imageView.setTranslationX(-dp(8));
+            setAvatarCell.imageView.setAnimation(cameraDrawable);
+        }
+    }
+
+    private void applyUploadedBotProfilePhoto(TLRPC.TL_photos_photo photosPhoto, TLRPC.PhotoSize smallSize, TLRPC.PhotoSize bigSize) {
+        if (photosPhoto == null) {
+            return;
+        }
+        getMessagesController().putUsers(photosPhoto.users, false);
+        TLRPC.User user = getMessagesController().getUser(userId);
+        if (user == null) {
+            user = currentUser;
+        }
+        if (user == null || !(photosPhoto.photo instanceof TLRPC.TL_photo)) {
+            return;
+        }
+        TLRPC.PhotoSize smallSize2 = FileLoader.getClosestPhotoSizeWithSize(photosPhoto.photo.sizes, 100);
+        TLRPC.PhotoSize bigSize2 = FileLoader.getClosestPhotoSizeWithSize(photosPhoto.photo.sizes, 1000);
+        if (smallSize2 != null && smallSize != null && smallSize.location != null) {
+            File destFile = FileLoader.getInstance(currentAccount).getPathToAttach(smallSize2, true);
+            File src = FileLoader.getInstance(currentAccount).getPathToAttach(smallSize.location, true);
+            src.renameTo(destFile);
+            String oldKey = smallSize.location.volume_id + "_" + smallSize.location.local_id + "@50_50";
+            String newKey = smallSize2.location.volume_id + "_" + smallSize2.location.local_id + "@50_50";
+            ImageLoader.getInstance().replaceImageInCache(oldKey, newKey, ImageLocation.getForUser(currentAccount, user, ImageLocation.TYPE_SMALL), false);
+        }
+        if (bigSize2 != null && bigSize != null && bigSize.location != null) {
+            File destFile = FileLoader.getInstance(currentAccount).getPathToAttach(bigSize2, true);
+            File src = FileLoader.getInstance(currentAccount).getPathToAttach(bigSize.location, true);
+            src.renameTo(destFile);
+        }
+        PhotoUtilities.applyPhotoToUser(photosPhoto.photo, user, false);
+        getMessagesController().putUser(user, false);
+        ArrayList<TLRPC.User> users = new ArrayList<>();
+        users.add(user);
+        getMessagesStorage().putUsersAndChats(users, null, false, true);
+        TLRPC.UserFull full = getMessagesController().getUserFull(userId);
+        if (full != null) {
+            full.profile_photo = photosPhoto.photo;
+            getMessagesStorage().updateUserInfo(full, false);
+        }
+        currentUser = user;
+    }
+
     @Override
     public void didUploadPhoto(final TLRPC.InputFile photo, final TLRPC.InputFile video, double videoStartTimestamp, String videoPath, final TLRPC.PhotoSize bigSize, final TLRPC.PhotoSize smallSize, boolean isVideo, TLRPC.VideoSize emojiMarkup) {
         AndroidUtilities.runOnUIThread(() -> {
             avatar = smallSize.location;
             if (photo != null || video != null || emojiMarkup != null) {
                 if (userId != 0) {
-                    if (currentUser != null) {
-                        currentUser.photo = new TLRPC.TL_userProfilePhoto();
-                        currentUser.photo.photo_id = photo != null ? photo.id : video != null ? video.id : 0;
-                        currentUser.photo.photo_big = bigSize.location;
-                        currentUser.photo.photo_small = smallSize.location;
-                        getMessagesController().putUser(currentUser, true);
-                    }
+                    // Keep the local preview on this screen. Do not write the
+                    // uploaded InputFile id onto user.photo: that is not a
+                    // photo_id, and setAvatar/setForUserOrChat would then try
+                    // to load InputPeerPhotoFileLocation for a missing photo.
+                    showLocalAvatarPreview();
 
                     TLRPC.TL_photos_uploadProfilePhoto req = new TLRPC.TL_photos_uploadProfilePhoto();
                     if (photo != null) {
@@ -1959,8 +2016,17 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
                     req.flags |= 32;
 
                     getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+                        if (error == null && response instanceof TLRPC.TL_photos_photo) {
+                            applyUploadedBotProfilePhoto((TLRPC.TL_photos_photo) response, smallSize, bigSize);
+                        }
                         hasUploadedPhoto = true;
-
+                        TLRPC.User user = getMessagesController().getUser(userId);
+                        if (user != null) {
+                            currentUser = user;
+                        }
+                        if (avatarImage != null && currentUser != null) {
+                            avatarImage.setForUserOrChat(currentUser, avatarDrawable);
+                        }
                         NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_AVATAR);
                     }));
                 } else {
