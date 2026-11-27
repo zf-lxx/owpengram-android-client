@@ -194,6 +194,7 @@ android {
     }
 }
 
-// Прибрано: без хмарних залежностей. Push працює через keep-alive (self-hosted),
-// білд не потребує Firebase-проєкту / google-services.json.
-// apply plugin: 'com.google.gms.google-services'
+// Enable Google services so google-services.json is processed into
+// google_app_id / gcm_defaultSenderId for FCM. The file in this module
+// must list applicationId (APP_PACKAGE / com.owpengram.messenger).
+apply plugin: 'com.google.gms.google-services'

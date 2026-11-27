@@ -251,8 +251,9 @@ def getProps(String propName) {
         return "";
     }
 }
-// Прибрано: без хмарних залежностей. Push працює через keep-alive (self-hosted),
-// білд не потребує Firebase-проєкту / google-services.json.
+// google-services is applied on the application module (TMessagesProj_App),
+// not on this Android library, to avoid duplicate processing. Keep the
+// JSON here in sync with TMessagesProj_App/google-services.json.
 // apply plugin: 'com.google.gms.google-services'
 
 task checkVisibility {
