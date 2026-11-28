@@ -118,7 +118,7 @@ public final class InputTaskStatusController {
             }
             ensureAccountObserver(account);
             String text = TextUtils.isEmpty(statusText) ? defaultStatusText() : statusText;
-            long key = key(account, dialogId);
+            String key = key(account, dialogId);
             Status existing = statuses.get(key);
             if (existing != null) {
                 existing.text = text;
@@ -162,7 +162,7 @@ public final class InputTaskStatusController {
                 return;
             }
             HashMap<Integer, ArrayList<Long>> byAccount = new HashMap<>();
-            Iterator<Map.Entry<Long, Status>> it = statuses.entrySet().iterator();
+            Iterator<Map.Entry<String, Status>> it = statuses.entrySet().iterator();
             while (it.hasNext()) {
                 Status s = it.next().getValue();
                 it.remove();
