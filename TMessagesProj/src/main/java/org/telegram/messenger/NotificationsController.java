@@ -1163,6 +1163,7 @@ public class NotificationsController extends BaseController implements Notificat
             return;
         }
 
+        final ArrayList<MessageObject> messages = messageObjects;
         ArrayList<MessageObject> popupArrayAdd = new ArrayList<>(0);
         notificationsQueue.postRunnable(() -> {
             boolean added = false;
@@ -1175,8 +1176,8 @@ public class NotificationsController extends BaseController implements Notificat
             int popup = 0;
             boolean hasScheduled = false;
 
-            for (int a = 0; a < messageObjects.size(); a++) {
-                MessageObject messageObject = messageObjects.get(a);
+            for (int a = 0; a < messages.size(); a++) {
+                MessageObject messageObject = messages.get(a);
                 if (messageObject.messageOwner != null && (messageObject.isImportedForward() ||
                         messageObject.messageOwner.action instanceof TLRPC.TL_messageActionSetMessagesTTL ||
                         messageObject.messageOwner.silent && (messageObject.messageOwner.action instanceof TLRPC.TL_messageActionContactSignUp || messageObject.messageOwner.action instanceof TLRPC.TL_messageActionUserJoined)) ||
@@ -1398,7 +1399,7 @@ public class NotificationsController extends BaseController implements Notificat
                     if (BuildVars.LOGS_ENABLED) {
                         FileLog.d("NotificationsController processNewMessages: added branch");
                     }
-                    MessageObject messageObject = messageObjects.get(0);
+                    MessageObject messageObject = messages.get(0);
                     long dialog_id = messageObject.getDialogId();
                     long topicId = MessageObject.getTopicId(currentAccount, messageObject.messageOwner, getMessagesController().isForum(dialog_id));
                     Boolean isChannel;
