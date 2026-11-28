@@ -132,6 +132,7 @@ import androidx.viewpager.widget.ViewPager;
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.owpengram.InputTaskStatusController;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.AuthTokensHelper;
 import org.telegram.messenger.BillingController;
@@ -4740,7 +4741,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 "Reload app config",
                                 !SharedConfig.forceForumTabs ? "Force Forum Tabs" : "Do Not Force Forum Tabs",
                             "Make Memory Dump",
-                                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.fastWallpaperDisabled ? "enable wallpaper shader" : "disable wallpaper shader") : null
+                                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.fastWallpaperDisabled ? "enable wallpaper shader" : "disable wallpaper shader") : null,
+                                InputTaskStatusController.isPreviewEnabled() ? getString(R.string.DebugMenuHideInputTaskStatus) : getString(R.string.DebugMenuPreviewInputTaskStatus)
                         };
 
                         builder.setItems(items, (dialog, which) -> {
@@ -5037,6 +5039,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 FileLog.getInstance().dumpMemory(true);
                             } else if (which == 38) {
                                 SharedConfig.toggleFastWallpaperDisabled();
+                            } else if (which == 39) {
+                                boolean enabled = InputTaskStatusController.togglePreviewEnabled();
+                                try {
+                                    Toast.makeText(getParentActivity(), getString(enabled ? R.string.DebugMenuPreviewInputTaskStatusOn : R.string.DebugMenuPreviewInputTaskStatusOff), Toast.LENGTH_LONG).show();
+                                } catch (Exception e) {
+                                    FileLog.e(e);
+                                }
                             }
                         });
                         builder.setNegativeButton(getString("Cancel", R.string.Cancel), null);

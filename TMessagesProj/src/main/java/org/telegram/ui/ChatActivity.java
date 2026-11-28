@@ -287,6 +287,8 @@ import org.telegram.ui.Components.chat.ChatActivityMessageMetricsView;
 import org.telegram.ui.Components.chat.ChatActivitySearchContainer;
 import org.telegram.ui.Components.chat.layouts.ChatActivityActionsButtonsLayout;
 import org.telegram.ui.Components.chat.layouts.ChatActivityChannelButtonsLayout;
+import org.telegram.owpengram.InputTaskStatusController;
+import org.telegram.ui.Components.InputTaskStatusView;
 import org.telegram.ui.Components.chat.ChatInputViewsContainer;
 import org.telegram.ui.Components.chat.ChatListViewPaddingsAnimator;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
@@ -436,6 +438,7 @@ public class ChatActivity extends BaseFragment implements
     private View progressView2;
     private FrameLayout bottomOverlay;
     public ChatInputViewsContainer chatInputViewsContainer;
+    private InputTaskStatusView inputTaskStatusView;
     private View roundVideoRecordBackground;
 
     private FrameLayout chatInputBubbleContainer;
@@ -1285,7 +1288,8 @@ public class ChatActivity extends BaseFragment implements
             NotificationCenter.didSetNewWallpapper,
             NotificationCenter.savedMessagesDialogsUpdate,
             NotificationCenter.didApplyNewTheme,
-            NotificationCenter.messageReceivedByServer2
+            NotificationCenter.messageReceivedByServer2,
+            NotificationCenter.inputTaskStatusChanged
     };
 
     private final DialogInterface.OnCancelListener postponedScrollCancelListener = dialog -> {
@@ -2917,6 +2921,8 @@ public class ChatActivity extends BaseFragment implements
 
         getNotificationCenter().addPostponeNotificationsCallback(postponeNotificationsWhileLoadingCallback);
         getNotificationCenter().addObserver(this, NotificationCenter.closeChats);
+        observersGroup.add(NotificationCenter.inputTaskStatusChanged);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.inputTaskStatusChanged);
 
         if (chatMode != MODE_SCHEDULED) {
             if (threadMessageId == 0) {
@@ -3438,6 +3444,11 @@ public class ChatActivity extends BaseFragment implements
         }
 
         getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.inputTaskStatusChanged);
+        InputTaskStatusController.hide(currentAccount, dialog_id);
+        if (inputTaskStatusView != null) {
+            inputTaskStatusView.hide();
+        }
 
         if (chatMode == 0 && AndroidUtilities.isTablet()) {
             getNotificationCenter().postNotificationName(NotificationCenter.openedChatChanged, dialog_id, getTopicId(), true);
@@ -8138,6 +8149,15 @@ public class ChatActivity extends BaseFragment implements
         contentView.addView(roundVideoRecordBackground, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         contentView.addView(chatInputViewsContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
+        inputTaskStatusView = new InputTaskStatusView(context, themeDelegate);
+        inputTaskStatusView.setHeightListener(() -> {
+            checkUi_chatListViewPaddings();
+            updatePagedownButtonsPosition();
+            checkUi_BlurHeight();
+        });
+        chatInputViewsContainer.setAboveIslandView(inputTaskStatusView);
+        syncInputTaskStatusBar();
+
         if (chatMode != MODE_EDIT_BUSINESS_LINK) {
             chatActivityEnterView.checkChannelRights();
         }
@@ -10978,6 +10998,7 @@ public class ChatActivity extends BaseFragment implements
         if (sideControlsButtonsLayout != null) {
             float baseTranslationY2 = -windowInsetsStateHolder.getAnimatedMaxBottomInset()
                 - chatInputViewsContainer.getInputBubbleHeight()
+                - getInputTaskStatusReservedHeight()
                 - getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)
                 - dp(ChatInputViewsContainer.INPUT_BUBBLE_BOTTOM + 4);
             sideControlsButtonsLayout.setTranslationY(baseTranslationY2);
@@ -12111,6 +12132,32 @@ public class ChatActivity extends BaseFragment implements
         checkUi_chatListViewPaddings();
     }
 
+    private float getInputTaskStatusReservedHeight() {
+        return inputTaskStatusView != null ? inputTaskStatusView.getReservedHeight() : 0;
+    }
+
+    /**
+     * Applies the explicit {@link InputTaskStatusController} state for this
+     * chat. Typing / sendChatAction never calls this; only show()/update()/
+     * hide(), the debug preview toggle, or auto-hide triggers do.
+     */
+    private void syncInputTaskStatusBar() {
+        if (inputTaskStatusView == null) {
+            return;
+        }
+        inputTaskStatusView.bindPeer(currentUser, currentChat);
+        InputTaskStatusController.Status status = InputTaskStatusController.get(currentAccount, dialog_id);
+        if (status == null && InputTaskStatusController.isPreviewEnabled() && dialog_id != 0 && chatMode == 0) {
+            InputTaskStatusController.show(currentAccount, dialog_id, null);
+            return;
+        }
+        if (status != null) {
+            inputTaskStatusView.showOrUpdate(status.text, status.startedAtElapsedRealtime);
+        } else {
+            inputTaskStatusView.hide();
+        }
+    }
+
     private void checkUi_chatListViewPaddings() {
         if (chatListView == null) {
             return;
@@ -12122,6 +12169,7 @@ public class ChatActivity extends BaseFragment implements
         } else {
             paddingBottom = blurredViewBottomOffset + dp(9 + 7)
                 + inputIslandHeightCurrent
+                + getInputTaskStatusReservedHeight()
                 + getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)
                 + windowInsetsStateHolder.getAnimatedMaxBottomInset();
         }
@@ -20783,6 +20831,16 @@ public class ChatActivity extends BaseFragment implements
 
     @Override
     public void didReceivedNotification(int id, int account, final Object... args) {
+        if (id == NotificationCenter.inputTaskStatusChanged) {
+            long did = 0;
+            if (args != null && args.length > 0 && args[0] instanceof Long) {
+                did = (Long) args[0];
+            }
+            if (did == 0 || did == dialog_id) {
+                syncInputTaskStatusBar();
+            }
+            return;
+        }
         if (id == NotificationCenter.messagesDidLoad) {
             didReceivedNotification_messagesDidLoad(id, account, args);
         } else {
@@ -27329,6 +27387,7 @@ public class ChatActivity extends BaseFragment implements
     public void onBecomeFullyVisible() {
         isFullyVisible = true;
         super.onBecomeFullyVisible();
+        syncInputTaskStatusBar();
         if (showCloseChatDialogLater) {
             showDialog(closeChatDialog);
         }

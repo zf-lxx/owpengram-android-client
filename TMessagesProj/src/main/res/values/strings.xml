@@ -11649,4 +11649,9 @@
     <string name="NoPaidMessagesTokenUsed">un1 used your QR code and can message you for free</string>
     <string name="NoPaidMessagesTokenUsedOut">You used the QR code of un1 and can message them for free</string>
     <string name="NoPaidMessagesTokenImported">You can now message **%1$s** for free.</string>
+    <string name="InputTaskStatusDefault">Replying</string>
+    <string name="DebugMenuPreviewInputTaskStatus">Preview input task status</string>
+    <string name="DebugMenuHideInputTaskStatus">Hide input task status</string>
+    <string name="DebugMenuPreviewInputTaskStatusOn">Preview on. Open a chat to see the status above the input.</string>
+    <string name="DebugMenuPreviewInputTaskStatusOff">Input task status preview hidden.</string>
 </resources>

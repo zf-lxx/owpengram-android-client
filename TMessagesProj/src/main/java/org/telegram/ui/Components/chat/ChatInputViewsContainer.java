@@ -34,6 +34,7 @@ public class ChatInputViewsContainer extends FrameLayout {
     private final View fadeView;
     private final FrameLayout inputIslandBubbleContainer;
     private final FrameLayout inAppKeyboardBubbleContainer;
+    private View aboveIslandView;
 
     public ChatInputViewsContainer(@NonNull Context context) {
         super(context);
@@ -105,6 +106,29 @@ public class ChatInputViewsContainer extends FrameLayout {
     @NonNull
     public FrameLayout getInAppKeyboardBubbleContainer() {
         return inAppKeyboardBubbleContainer;
+    }
+
+    /**
+     * Places a compact view just above the input island (outside the composer
+     * bubble). Used for the explicit task-status bar. The island background
+     * is not expanded to include this view.
+     */
+    public void setAboveIslandView(View view) {
+        if (aboveIslandView == view) {
+            return;
+        }
+        if (aboveIslandView != null) {
+            removeView(aboveIslandView);
+        }
+        aboveIslandView = view;
+        if (view != null) {
+            addView(view, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
+        }
+        checkViewsPositions();
+    }
+
+    public View getAboveIslandView() {
+        return aboveIslandView;
     }
 
     @Override
@@ -184,6 +208,10 @@ public class ChatInputViewsContainer extends FrameLayout {
     private void checkViewsPositions() {
         inputIslandBubbleContainer.setTranslationY(-maxBottomInset - dp(INPUT_BUBBLE_BOTTOM));
         inAppKeyboardBubbleContainer.setTranslationY(inAppKeyboardBubbleContainer.getMeasuredHeight() - imeBottomInset);
+        if (aboveIslandView != null) {
+            // Sit just above the composer island, on the chat background.
+            aboveIslandView.setTranslationY(-maxBottomInset - dp(INPUT_BUBBLE_BOTTOM) - inputBubbleHeight - dp(2));
+        }
     }
 
 

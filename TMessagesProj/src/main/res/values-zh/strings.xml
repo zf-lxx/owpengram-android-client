@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="InputTaskStatusDefault">正在回复</string>
+    <string name="DebugMenuPreviewInputTaskStatus">演示输入框任务进度</string>
+    <string name="DebugMenuHideInputTaskStatus">隐藏输入框任务进度</string>
+    <string name="DebugMenuPreviewInputTaskStatusOn">已开启演示：打开任意会话，输入框上方会出现任务进度。</string>
+    <string name="DebugMenuPreviewInputTaskStatusOff">已关闭输入框任务进度演示。</string>
+</resources>
