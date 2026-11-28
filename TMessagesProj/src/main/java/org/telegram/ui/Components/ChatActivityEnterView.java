@@ -203,6 +203,7 @@ import org.telegram.ui.StickersActivity;
 import org.telegram.ui.Stories.HighlightMessageSheet;
 import org.telegram.ui.Stories.recorder.CaptionContainerView;
 import org.telegram.ui.Stories.recorder.HintView2;
+import org.telegram.owpengram.localweb.LocalBotWebViewController;
 import org.telegram.ui.bots.BotCommandsMenuContainer;
 import org.telegram.ui.bots.BotCommandsMenuView;
 import org.telegram.ui.bots.BotKeyboardView;
@@ -11533,6 +11534,9 @@ public class ChatActivityEnterView extends FrameLayout implements
         } else if (TLKeyboardHelper.isButtonWebView(button)) {
             long botId = messageObject.messageOwner.via_bot_id != 0 ? messageObject.messageOwner.via_bot_id : messageObject.messageOwner.from_id.user_id;
             TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(botId);
+            if (LocalBotWebViewController.tryOpenFromWebAppButton(parentFragment, currentAccount, user, messageObject.messageOwner.dialog_id, button.getUrl(), button.getText())) {
+                return true;
+            }
             Runnable onRequestWebView = new Runnable() {
                 @Override
                 public void run() {

@@ -288,6 +288,7 @@ import org.telegram.ui.Components.chat.ChatActivitySearchContainer;
 import org.telegram.ui.Components.chat.layouts.ChatActivityActionsButtonsLayout;
 import org.telegram.ui.Components.chat.layouts.ChatActivityChannelButtonsLayout;
 import org.telegram.owpengram.InputTaskStatusController;
+import org.telegram.owpengram.localweb.LocalBotProtocol;
 import org.telegram.ui.Components.InputTaskStatusView;
 import org.telegram.ui.Components.chat.ChatInputViewsContainer;
 import org.telegram.ui.Components.chat.ChatListViewPaddingsAnimator;
@@ -20887,6 +20888,9 @@ public class ChatActivity extends BaseFragment implements
             postponedScrollToLastMessageQueryIndex = 0;
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
+        if (LocalBotProtocol.containsHidden(messArr)) {
+            messArr = LocalBotProtocol.withoutHidden(currentAccount, messArr);
+        }
 
         boolean universalNotify = false;
         HashMap<Integer, MessageObject> oldMessages = null;
@@ -25663,6 +25667,12 @@ public class ChatActivity extends BaseFragment implements
         processNewMessages(arr, true);
     }
     private void processNewMessages(ArrayList<MessageObject> arr, final boolean animatedFromBottom) {
+        if (LocalBotProtocol.containsHidden(arr)) {
+            arr = LocalBotProtocol.withoutHidden(currentAccount, arr);
+            if (arr.isEmpty()) {
+                return;
+            }
+        }
         FileLog.d("processNewMessages " + arr.size() + " messages");
 
         final boolean isBot = UserObject.isBot(currentUser);

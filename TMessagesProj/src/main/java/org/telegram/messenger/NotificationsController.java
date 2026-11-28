@@ -66,6 +66,7 @@ import androidx.core.graphics.drawable.IconCompat;
 
 import com.google.common.collect.Lists;
 
+import org.telegram.owpengram.localweb.LocalBotProtocol;
 import org.telegram.messenger.support.LongSparseIntArray;
 import org.telegram.messenger.utils.tlutils.TLKeyboardHelper;
 import org.telegram.messenger.utils.tlutils.TlUtils;
@@ -1138,6 +1139,10 @@ public class NotificationsController extends BaseController implements Notificat
                     }
                 }
             }
+        }
+
+        if (LocalBotProtocol.containsHidden(messageObjects)) {
+            messageObjects = LocalBotProtocol.withoutHidden(currentAccount, messageObjects);
         }
 
         if (messageObjects.isEmpty()) {

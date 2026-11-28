@@ -5,4 +5,6 @@
     <string name="DebugMenuHideInputTaskStatus">隐藏输入框任务进度</string>
     <string name="DebugMenuPreviewInputTaskStatusOn">已开启演示：打开任意会话，输入框上方会出现任务进度。</string>
     <string name="DebugMenuPreviewInputTaskStatusOff">已关闭输入框任务进度演示。</string>
+    <string name="LocalBotWebViewTitle">设置</string>
+    <string name="LocalBotWebViewSubtitle">本地打开，不走公网</string>
 </resources>

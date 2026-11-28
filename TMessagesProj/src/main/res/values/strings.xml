@@ -11654,4 +11654,6 @@
     <string name="DebugMenuHideInputTaskStatus">Hide input task status</string>
     <string name="DebugMenuPreviewInputTaskStatusOn">Preview on. Open a chat to see the status above the input.</string>
     <string name="DebugMenuPreviewInputTaskStatusOff">Input task status preview hidden.</string>
+    <string name="LocalBotWebViewTitle">Settings</string>
+    <string name="LocalBotWebViewSubtitle">Opens locally, not over the public internet</string>
 </resources>

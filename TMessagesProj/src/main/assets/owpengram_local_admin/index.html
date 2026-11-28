@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Manus 设置</title>
+    <link rel="stylesheet" href="./app.css" />
+    <script src="./bridge.js"></script>
+  </head>
+  <body>
+    <div class="topbar" aria-hidden="true"></div>
+    <main id="app">
+      <header>
+        <h1>设置</h1>
+        <p class="sub">改动只保存在本聊天配置里，不会进入对话。此页在本地打开，接口走会话通道，不访问公网。</p>
+      </header>
+      <p id="banner" class="banner hidden" hidden></p>
+
+      <section>
+        <h2>状态</h2>
+        <div id="status" class="card muted">加载中…</div>
+      </section>
+
+      <section>
+        <h2>模型</h2>
+        <div id="models" class="list"></div>
+      </section>
+
+      <section>
+        <h2>技能</h2>
+        <div id="skills" class="list"></div>
+        <form id="skill-form" class="card form">
+          <label>用 URL 添加 SKILL.md
+            <input id="skill-url" type="url" placeholder="https://…/SKILL.md" autocomplete="off" />
+          </label>
+          <div class="row">
+            <button type="submit" class="btn">添加链接</button>
+            <label class="btn ghost file-btn">上传文件
+              <input id="skill-file" type="file" accept=".md,text/markdown,text/plain" hidden />
+            </label>
+          </div>
+        </form>
+      </section>
+
+      <section>
+        <h2>MCP</h2>
+        <div id="mcp" class="list"></div>
+        <form id="mcp-form" class="card form">
+          <label>名称
+            <input id="mcp-name" type="text" pattern="[A-Za-z0-9_-]+" placeholder="docs" autocomplete="off" />
+          </label>
+          <label>URL
+            <input id="mcp-url" type="url" placeholder="https://example.com/mcp" autocomplete="off" />
+          </label>
+          <label>请求头（可选，值必须用 ${VAR}）
+            <input id="mcp-header-name" type="text" placeholder="Authorization" autocomplete="off" />
+            <input id="mcp-header-value" type="text" placeholder="Bearer ${MCP_TOKEN}" autocomplete="off" />
+          </label>
+          <p class="hint">密钥写在服务器 .env，这里只能引用 ${变量名}。</p>
+          <button type="submit" class="btn">添加并启用</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>会话</h2>
+        <div class="card">
+          <p class="hint">只清空对话上下文，保留模型、技能和 MCP。</p>
+          <button id="btn-reset" type="button" class="btn danger">开新会话</button>
+        </div>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
