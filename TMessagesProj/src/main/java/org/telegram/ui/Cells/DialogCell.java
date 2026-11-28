@@ -61,6 +61,7 @@ import androidx.core.graphics.ColorUtils;
 import androidx.core.math.MathUtils;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.owpengram.InputTaskStatusController;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ChatThemeController;
@@ -1325,6 +1326,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             message.updateTranslation();
         }
         CharSequence msgText = message != null ? message.messageText : null;
+        CharSequence placeholderPreview = InputTaskStatusController.dialogPreviewOverride(currentAccount, message);
+        if (placeholderPreview != null) {
+            msgText = placeholderPreview;
+        }
         if (msgText instanceof Spannable) {
             Spannable sp = new SpannableStringBuilder(msgText);
             for (Object span : sp.getSpans(0, sp.length(), URLSpanNoUnderlineBold.class))

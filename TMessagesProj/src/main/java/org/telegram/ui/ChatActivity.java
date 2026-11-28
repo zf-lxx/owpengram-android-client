@@ -12138,8 +12138,9 @@ public class ChatActivity extends BaseFragment implements
 
     /**
      * Applies the explicit {@link InputTaskStatusController} state for this
-     * chat. Typing / sendChatAction never calls this; only show()/update()/
-     * hide(), the debug preview toggle, or auto-hide triggers do.
+     * chat. Ordinary bot typing never opens the bar. For allowlisted agent
+     * bots, the bar is shown when the user sends a message (or a wait
+     * placeholder arrives) and typing only keeps an already visible bar alive.
      */
     private void syncInputTaskStatusBar() {
         if (inputTaskStatusView == null) {
@@ -20887,6 +20888,10 @@ public class ChatActivity extends BaseFragment implements
             postponedScrollToLastMessageQueryIndex = 0;
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
+        InputTaskStatusController.onMessagesLoaded(currentAccount, dialog_id, messArr);
+        if (InputTaskStatusController.containsWaitPlaceholder(currentAccount, messArr)) {
+            messArr = InputTaskStatusController.withoutWaitPlaceholder(currentAccount, messArr, false);
+        }
 
         boolean universalNotify = false;
         HashMap<Integer, MessageObject> oldMessages = null;
@@ -22282,6 +22287,7 @@ public class ChatActivity extends BaseFragment implements
             }
             if ((updateMask & MessagesController.UPDATE_MASK_USER_PRINT) != 0) {
                 updateSubtitle = true;
+                InputTaskStatusController.onAgentTyping(currentAccount, dialog_id);
             }
             if ((updateMask & MessagesController.UPDATE_MASK_CHAT) != 0 && currentChat != null) {
                 boolean fwdBefore = isPeerNoForwards();
@@ -23703,7 +23709,22 @@ public class ChatActivity extends BaseFragment implements
             }
             int loadIndex = did == dialog_id ? 0 : 1;
             doOnIdle(() -> {
-                replaceMessageObjects(messageObjects, loadIndex, false);
+                ArrayList<MessageObject> revealed = new ArrayList<>();
+                ArrayList<MessageObject> visibleEdits = new ArrayList<>();
+                InputTaskStatusController.applyEdits(currentAccount, messageObjects, revealed, visibleEdits);
+                if (!revealed.isEmpty()) {
+                    ArrayList<MessageObject> toInsert = new ArrayList<>();
+                    for (int i = 0; i < revealed.size(); i++) {
+                        MessageObject revealedMsg = revealed.get(i);
+                        if (revealedMsg != null && messagesDict[loadIndex].get(revealedMsg.getId()) == null) {
+                            toInsert.add(revealedMsg);
+                        }
+                    }
+                    if (!toInsert.isEmpty()) {
+                        processNewMessages(toInsert);
+                    }
+                }
+                replaceMessageObjects(visibleEdits.size() != messageObjects.size() ? visibleEdits : messageObjects, loadIndex, false);
             });
         } else if (id == NotificationCenter.notificationsSettingsUpdated) {
             updateTitleIcons();
@@ -25663,6 +25684,12 @@ public class ChatActivity extends BaseFragment implements
         processNewMessages(arr, true);
     }
     private void processNewMessages(ArrayList<MessageObject> arr, final boolean animatedFromBottom) {
+        if (InputTaskStatusController.containsWaitPlaceholder(currentAccount, arr)) {
+            arr = InputTaskStatusController.withoutWaitPlaceholder(currentAccount, arr);
+            if (arr.isEmpty()) {
+                return;
+            }
+        }
         FileLog.d("processNewMessages " + arr.size() + " messages");
 
         final boolean isBot = UserObject.isBot(currentUser);

@@ -67,6 +67,7 @@ import androidx.core.graphics.drawable.IconCompat;
 import com.google.common.collect.Lists;
 
 import org.telegram.messenger.support.LongSparseIntArray;
+import org.telegram.owpengram.InputTaskStatusController;
 import org.telegram.messenger.utils.tlutils.TLKeyboardHelper;
 import org.telegram.messenger.utils.tlutils.TlUtils;
 import org.telegram.messenger.voip.VoIPGroupNotification;
@@ -1065,6 +1066,17 @@ public class NotificationsController extends BaseController implements Notificat
             }
         }
 
+        ArrayList<MessageObject> revealedPlaceholders = new ArrayList<>();
+        for (int i = 0; i < editedMessages.size(); ++i) {
+            ArrayList<MessageObject> editedList = editedMessages.valueAt(i);
+            if (editedList != null) {
+                revealedPlaceholders.addAll(InputTaskStatusController.takeRevealedEdits(currentAccount, editedList));
+            }
+        }
+        if (!revealedPlaceholders.isEmpty()) {
+            processNewMessages(revealedPlaceholders, true, false, null);
+        }
+
         ArrayList<MessageObject> popupArrayAdd = new ArrayList<>(0);
         notificationsQueue.postRunnable(() -> {
             boolean updated = false;
@@ -1138,6 +1150,10 @@ public class NotificationsController extends BaseController implements Notificat
                     }
                 }
             }
+        }
+
+        if (InputTaskStatusController.containsWaitPlaceholder(currentAccount, messageObjects)) {
+            messageObjects = InputTaskStatusController.withoutWaitPlaceholder(currentAccount, messageObjects);
         }
 
         if (messageObjects.isEmpty()) {
